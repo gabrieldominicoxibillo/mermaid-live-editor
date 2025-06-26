@@ -7,9 +7,10 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd backend && nodemon server.js",
     "client": "cd frontend && npm start",
-    "build": "npm install && cd frontend && npm install && npm run build && cd ../backend && npm install",
-    "start": "cd backend && node server.js",
-    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+    "build": "cd frontend && npm ci && npm run build",
+    "start": "cd backend && npm ci && node server.js",
+    "install-all": "npm ci && cd backend && npm ci && cd ../frontend && npm ci",
+    "postinstall": "cd backend && npm ci && cd ../frontend && npm ci"
   },
   "keywords": ["mermaid", "diagram", "editor"],
   "author": "",
@@ -23,4 +24,3 @@
     "nodemon": "^2.0.20"
   }
 }
-
