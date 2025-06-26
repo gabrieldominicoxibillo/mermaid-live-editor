@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "postinstall": "npm ls @mermaid-js/mermaid-cli || echo 'Mermaid CLI check complete'"
   },
   "engines": {
     "node": ">=16.0.0",

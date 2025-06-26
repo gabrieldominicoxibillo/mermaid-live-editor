@@ -13,6 +13,11 @@ const config = require('./config/config');
 const app = express();
 const PORT = process.env.PORT || config.PORT || 3001;
 
+// Trust proxy for production deployment behind reverse proxy
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
@@ -32,7 +37,11 @@ app.use(helmet({
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
-  message: { error: 'Too many requests from this IP' }
+  message: { error: 'Too many requests from this IP' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Skip rate limiting for health checks
+  skip: (req) => req.path === '/health' || req.path === '/api/health'
 });
 app.use('/api/', limiter);
 
@@ -110,7 +119,4 @@ app.use((err, req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Mermaid Editor API ready`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-});
-
-module.exports = app;
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development
