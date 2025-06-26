@@ -32,7 +32,26 @@ const config = {
     'svg': 'image/svg+xml',
     'png': 'image/png',
     'pdf': 'application/pdf'
-  }
+  },
+
+  // Puppeteer configuration
+  PUPPETEER_CONFIG: {
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+      '--disable-gpu'
+    ]
+  },
+
+  // Render timeout
+  RENDER_TIMEOUT: parseInt(process.env.RENDER_TIMEOUT) || 30000
 };
 
 module.exports = config;

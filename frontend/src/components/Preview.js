@@ -14,13 +14,15 @@ const Preview = ({ data, isLoading, error, options, onOptionsChange }) => {
       dataSample: data ? data.substring(0, 50) + '...' : null,
       isLoading,
       error,
-      options: JSON.stringify(options)
+      options: options ? JSON.stringify(options) : null
     });
   }, [data, isLoading, error, options]);
 
   const handleThemeChange = (e) => {
     console.log('🎨 Theme changed to:', e.target.value);
-    onOptionsChange({ theme: e.target.value });
+    if (onOptionsChange) {
+      onOptionsChange({ theme: e.target.value });
+    }
   };
 
   const handleZoomIn = () => {
@@ -71,7 +73,7 @@ const Preview = ({ data, isLoading, error, options, onOptionsChange }) => {
           <div className="error-icon">⚠️</div>
           <div className="error-message">
             <h3>Diagram Error</h3>
-            <p>{error}</p>
+            <p>{String(error)}</p>
             <div className="error-suggestions">
               <p>Common fixes:</p>
               <ul>
@@ -109,16 +111,8 @@ const Preview = ({ data, isLoading, error, options, onOptionsChange }) => {
       );
     }
 
-    console.log('✅ Rendering diagram with data:');
-    console.log('📊 Data details:', {
-      length: data.length,
-      firstChars: data.substring(0, 100),
-      lastChars: data.substring(data.length - 50),
-      isBase64Valid: /^[A-Za-z0-9+/]*={0,2}$/.test(data)
-    });
-
+    console.log('✅ Rendering diagram with data');
     const imageDataUri = `data:image/svg+xml;base64,${data}`;
-    console.log('🖼️ Image data URI created:', imageDataUri.substring(0, 100) + '...');
 
     return (
       <div className="preview-diagram">
@@ -132,57 +126,15 @@ const Preview = ({ data, isLoading, error, options, onOptionsChange }) => {
             className="diagram-image"
             onLoad={(e) => {
               console.log('✅ Image loaded successfully!');
-              console.log('📐 Image dimensions:', {
-                naturalWidth: e.target.naturalWidth,
-                naturalHeight: e.target.naturalHeight,
-                displayWidth: e.target.width,
-                displayHeight: e.target.height
-              });
               setImageLoadStatus('loaded');
             }}
             onError={(e) => {
               console.error('❌ Image load error:', e);
-              console.error('❌ Failed image src length:', e.target.src.length);
-              console.error('❌ Error details:', {
-                src: e.target.src.substring(0, 100) + '...',
-                naturalWidth: e.target.naturalWidth,
-                naturalHeight: e.target.naturalHeight
-              });
               setImageLoadStatus('error');
-
-              // Try alternative formats if SVG fails
-              const img = e.target;
-              if (img.src.includes('svg+xml')) {
-                console.log('🔄 Trying PNG format...');
-                img.src = `data:image/png;base64,${data}`;
-              } else if (img.src.includes('png')) {
-                console.log('🔄 PNG also failed, trying as raw SVG...');
-                // Try to decode base64 and use as raw SVG
-                try {
-                  const decodedSvg = atob(data);
-                  console.log('📄 Decoded SVG content:', decodedSvg.substring(0, 200) + '...');
-                  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(decodedSvg)}`;
-                } catch (decodeError) {
-                  console.error('❌ Failed to decode base64:', decodeError);
-                }
-              }
-            }}
-            style={{
-              border: imageLoadStatus === 'error' ? '2px solid red' : 'none',
-              background: imageLoadStatus === 'error' ? '#ffebee' : 'transparent'
             }}
           />
           {imageLoadStatus === 'error' && (
-            <div style={{
-              position: 'absolute',
-              top: '10px',
-              left: '10px',
-              background: 'rgba(255,0,0,0.8)',
-              color: 'white',
-              padding: '5px 10px',
-              borderRadius: '4px',
-              fontSize: '12px'
-            }}>
+            <div className="image-error-overlay">
               Image Load Failed
             </div>
           )}
@@ -198,7 +150,7 @@ const Preview = ({ data, isLoading, error, options, onOptionsChange }) => {
           🔍 Preview
           {data && (
             <div className="preview-info">
-              Theme: {options.theme} | Status: {imageLoadStatus}
+              Theme: {options?.theme || 'default'} | Status: {imageLoadStatus}
             </div>
           )}
         </div>
@@ -206,7 +158,7 @@ const Preview = ({ data, isLoading, error, options, onOptionsChange }) => {
         <div className="preview-controls">
           <div className="control-group">
             <label>Theme:</label>
-            <select value={options.theme} onChange={handleThemeChange}>
+            <select value={options?.theme || 'default'} onChange={handleThemeChange}>
               <option value="default">Default</option>
               <option value="dark">Dark</option>
               <option value="forest">Forest</option>
@@ -214,23 +166,19 @@ const Preview = ({ data, isLoading, error, options, onOptionsChange }) => {
             </select>
           </div>
 
-          {data && (
-            <>
-              <div className="control-group">
-                <label>Zoom:</label>
-                <div className="zoom-controls">
-                  <button className="zoom-btn" onClick={handleZoomOut}>−</button>
-                  <span className="zoom-display">{Math.round(zoom * 100)}%</span>
-                  <button className="zoom-btn" onClick={handleZoomIn}>+</button>
-                  <button className="reset-btn" onClick={handleResetZoom}>Reset</button>
-                </div>
-              </div>
+          <div className="control-group">
+            <label>Zoom:</label>
+            <div className="zoom-controls">
+              <button className="zoom-btn" onClick={handleZoomOut}>-</button>
+              <span className="zoom-display">{Math.round(zoom * 100)}%</span>
+              <button className="zoom-btn" onClick={handleZoomIn}>+</button>
+              <button className="reset-btn" onClick={handleResetZoom}>Reset</button>
+            </div>
+          </div>
 
-              <button className="fullscreen-btn" onClick={toggleFullscreen}>
-                {isFullscreen ? '⤓' : '⤢'}
-              </button>
-            </>
-          )}
+          <button className="fullscreen-btn" onClick={toggleFullscreen}>
+            {isFullscreen ? '⛶' : '⛶'}
+          </button>
         </div>
       </div>
 
@@ -238,17 +186,17 @@ const Preview = ({ data, isLoading, error, options, onOptionsChange }) => {
         {renderContent()}
       </div>
 
-      {data && (
-        <div className="preview-footer">
-          <div className="diagram-stats">
-            <span>✓ Data received ({data.length} chars)</span>
-            <span>•</span>
-            <span>Format: SVG</span>
-            <span>•</span>
-            <span>Load Status: {imageLoadStatus}</span>
-          </div>
+      <div className="preview-footer">
+        <div className="diagram-stats">
+          {data && (
+            <>
+              <span>Size: {Math.round(data.length * 0.75 / 1024)} KB</span>
+              <span>•</span>
+              <span>Zoom: {Math.round(zoom * 100)}%</span>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

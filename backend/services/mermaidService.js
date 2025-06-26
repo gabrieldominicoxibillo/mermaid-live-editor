@@ -37,9 +37,10 @@ class MermaidService {
       await fs.writeFile(inputFile, mermaidCode);
 
       return new Promise((resolve) => {
-        const command = `npx mmdc -i "${inputFile}" -o "${outputFile}" -w 200 -H 200`;
+        const command = this.buildValidationCommand(inputFile, outputFile);
+        const execOptions = this.getExecOptions();
 
-        exec(command, { timeout: 15000 }, async (error, stdout, stderr) => {
+        exec(command, execOptions, async (error, stdout, stderr) => {
           // Always cleanup temp files
           await Promise.all([
             FileUtils.safeDelete(inputFile),
@@ -132,9 +133,10 @@ class MermaidService {
       const command = this.buildRenderCommand(inputFile, outputFile, {
         format, theme, width, height, scale
       });
+      const execOptions = this.getExecOptions();
 
       return new Promise((resolve, reject) => {
-        exec(command, { timeout: 30000 }, async (error, stdout, stderr) => {
+        exec(command, execOptions, async (error, stdout, stderr) => {
           try {
             if (error) {
               const errorMessage = this.parseErrorMessage(stderr || error.message);
@@ -172,6 +174,57 @@ class MermaidService {
   }
 
   /**
+   * Get execution options with proper environment variables
+   * @private
+   */
+  getExecOptions() {
+    const env = { ...process.env };
+
+    // Set Puppeteer configuration for different platforms
+    if (config.PUPPETEER_CONFIG.executablePath) {
+      env.PUPPETEER_EXECUTABLE_PATH = config.PUPPETEER_CONFIG.executablePath;
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = 'true';
+
+      // Set Chrome path based on platform
+      if (process.platform === 'linux') {
+        env.PUPPETEER_EXECUTABLE_PATH = '/usr/bin/google-chrome-stable';
+      } else if (process.platform === 'win32') {
+        // Windows Chrome paths
+        const chromePaths = [
+          'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+          'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
+        ];
+        for (const chromePath of chromePaths) {
+          try {
+            require('fs').accessSync(chromePath);
+            env.PUPPETEER_EXECUTABLE_PATH = chromePath;
+            break;
+          } catch (e) {
+            // Continue to next path
+          }
+        }
+      }
+    }
+
+    return {
+      env,
+      timeout: config.RENDER_TIMEOUT || 30000,
+      maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+    };
+  }
+
+  /**
+   * Build validation command
+   * @private
+   */
+  buildValidationCommand(inputFile, outputFile) {
+    return `npx mmdc -i "${inputFile}" -o "${outputFile}" -w 200 -H 200`;
+  }
+
+  /**
    * Build mermaid-cli command with options
    * @private
    */
@@ -205,28 +258,28 @@ class MermaidService {
   }
 
   /**
-   * Parse error messages for better user feedback
+   * Parse error messages to make them user-friendly
    * @private
    */
-  parseErrorMessage(errorText) {
-    if (!errorText) return 'Unknown error occurred';
+  parseErrorMessage(errorMessage) {
+    if (!errorMessage) return 'Unknown rendering error';
 
-    // Common Mermaid error patterns
-    const patterns = [
-      { regex: /Parse error on line (\d+)/, message: 'Syntax error on line $1' },
-      { regex: /Expecting (.+) but/, message: 'Expected $1' },
-      { regex: /Unknown diagram type/, message: 'Unknown diagram type. Check the diagram declaration.' },
-      { regex: /ENOENT/, message: 'Mermaid CLI not found. Please install @mermaid-js/mermaid-cli' }
-    ];
-
-    for (const pattern of patterns) {
-      if (pattern.regex.test(errorText)) {
-        return errorText.replace(pattern.regex, pattern.message);
-      }
+    // Common error patterns
+    if (errorMessage.includes('Parse error')) {
+      return 'Syntax error in diagram code';
+    }
+    if (errorMessage.includes('Expecting')) {
+      return 'Invalid diagram syntax - check your diagram structure';
+    }
+    if (errorMessage.includes('timeout')) {
+      return 'Diagram too complex or rendering timeout';
+    }
+    if (errorMessage.includes('ENOENT')) {
+      return 'Mermaid CLI not found - installation issue';
     }
 
-    // Return cleaned error message
-    return errorText.split('\n')[0].trim();
+    // Return the first line of the error message
+    return errorMessage.split('\n')[0] || 'Rendering failed';
   }
 
   /**
@@ -234,23 +287,19 @@ class MermaidService {
    */
   getSupportedDiagramTypes() {
     return [
-      'flowchart',
-      'graph',
-      'sequenceDiagram',
-      'classDiagram',
-      'stateDiagram',
-      'gantt',
-      'pie',
-      'journey',
-      'gitgraph',
-      'requirement',
-      'mindmap',
-      'timeline'
+      { type: 'flowchart', name: 'Flowchart', example: 'flowchart TD' },
+      { type: 'sequence', name: 'Sequence Diagram', example: 'sequenceDiagram' },
+      { type: 'class', name: 'Class Diagram', example: 'classDiagram' },
+      { type: 'state', name: 'State Diagram', example: 'stateDiagram' },
+      { type: 'gantt', name: 'Gantt Chart', example: 'gantt' },
+      { type: 'pie', name: 'Pie Chart', example: 'pie' },
+      { type: 'journey', name: 'User Journey', example: 'journey' },
+      { type: 'git', name: 'Git Graph', example: 'gitgraph' }
     ];
   }
 
   /**
-   * Get example diagram for a specific type
+   * Get example diagram by type
    */
   getExampleDiagram(type = 'flowchart') {
     const examples = {
@@ -260,29 +309,22 @@ class MermaidService {
     B -->|No| D[Debug]
     D --> B
     C --> E[End]`,
-
       sequence: `sequenceDiagram
-    participant User
-    participant App
-    participant API
-    
-    User->>App: Request data
-    App->>API: Fetch data
-    API-->>App: Return data
-    App-->>User: Display data`,
-
+    participant A as Alice
+    participant B as Bob
+    A->>B: Hello Bob, how are you?
+    B-->>A: Great!
+    A->>B: See you later!`,
       class: `classDiagram
     class Animal {
         +String name
         +int age
         +makeSound()
     }
-    
     class Dog {
         +String breed
         +bark()
     }
-    
     Animal <|-- Dog`
     };
 
